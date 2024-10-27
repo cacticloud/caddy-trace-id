@@ -1,4 +1,4 @@
-package caddy_unique_id
+package caddy_req_id
 
 import (
 	"crypto/sha256"
@@ -15,7 +15,7 @@ import (
 
 func init() {
 	caddy.RegisterModule(UniqueID{})
-	httpcaddyfile.RegisterHandlerDirective("unique_id", parseCaddyfile)
+	httpcaddyfile.RegisterHandlerDirective("req_id", parseCaddyfile)
 }
 
 type UniqueID struct {
@@ -25,7 +25,7 @@ type UniqueID struct {
 
 func (UniqueID) CaddyModule() caddy.ModuleInfo {
 	return caddy.ModuleInfo{
-		ID:  "http.handlers.unique_id",
+		ID:  "http.handlers.req_id",
 		New: func() caddy.Module { return new(UniqueID) },
 	}
 }
@@ -43,17 +43,8 @@ func (u UniqueID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyht
 	}
 
 	uniqueID := generateUniqueID(time.Now(), r.RemoteAddr, userID, r.Method, r.URL.String())
-	r.Header.Set("X-Unique-ID", uniqueID)   // 设置请求头，传递到后端
-	w.Header().Set("X-Unique-ID", uniqueID) // 设置响应头，返回给客户端
-
-	u.Logger.Info("Request received",
-		zap.String("time", time.Now().Format(time.RFC3339Nano)),
-		zap.String("remote_addr", r.RemoteAddr),
-		zap.String("user_id", userID),
-		zap.String("method", r.Method),
-		zap.String("url", r.URL.String()),
-		zap.String("unique_id", uniqueID),
-	)
+	r.Header.Set("X-Unique-ID", uniqueID) // 设置请求头，传递到后端
+	// w.Header().Set("X-Unique-ID", uniqueID) // 设置响应头，返回给客户端
 
 	return next.ServeHTTP(w, r)
 }
