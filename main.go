@@ -1,32 +1,59 @@
 package caddytraceid
 
 import (
-	"net/http"
+	"context"
+	"net"
 
 	"github.com/caddyserver/caddy/v2"
-	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 )
 
-func init() {
-	caddy.RegisterModule(Gizmo{})
+type Hello struct {
+	Address string `json:"address"`
+
+	listener net.Listener
 }
 
-type Gizmo struct{}
-
-// CaddyModule 返回 Caddy 模块的信息，现在使用 http.handlers 命名空间
-func (Gizmo) CaddyModule() caddy.ModuleInfo {
+func (Hello) CaddyModule() caddy.ModuleInfo {
 	return caddy.ModuleInfo{
-		ID:  "http.handler.gizmo", // 修改这里以匹配 http.handlers
-		New: func() caddy.Module { return new(Gizmo) },
+		ID:  "caddy_hello",
+		New: func() caddy.Module { return new(Hello) },
 	}
 }
 
-// ServeHTTP 实现 caddyhttp.MiddlewareHandler 接口
-func (g *Gizmo) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-	// 实现你的处理逻辑
-	return next.ServeHTTP(w, r)
+func init() {
+	caddy.RegisterModule(Hello{})
 }
 
-var (
-	_ caddyhttp.MiddlewareHandler = (*Gizmo)(nil) // 确保 Gizmo 实现了 MiddlewareHandler 接口
-)
+func (h *Hello) Start() error {
+	network, err := caddy.ParseNetworkAddress(h.Address)
+	if err != nil {
+		return err
+	}
+
+	listener, err := network.Listen(context.Background(), 0, net.ListenConfig{})
+	if err != nil {
+		return err
+	}
+	h.listener = listener.(net.Listener)
+	go h.loop()
+	return nil
+}
+
+func (h *Hello) Stop() error {
+	return h.listener.Close()
+}
+
+func (h *Hello) loop() {
+	for {
+		c, err := h.listener.Accept()
+		if err != nil {
+			break
+		}
+		go h.handleConn(c)
+	}
+}
+
+func (h *Hello) handleConn(c net.Conn) {
+	_, _ = c.Write([]byte("Hello world"))
+	_ = c.Close()
+}
