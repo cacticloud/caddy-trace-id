@@ -17,7 +17,7 @@ func init() {
 
 type ReqID struct {
 	Logger       *zap.Logger
-	CurrentReqID string // 存储为请求处理的一部分的当前 Req-ID
+	CurrentReqID string
 }
 
 func (ReqID) CaddyModule() caddy.ModuleInfo {
@@ -47,9 +47,9 @@ var (
 )
 
 func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
-	var u ReqID
 	if !h.Next() {
 		return nil, h.ArgErr()
 	}
+	u := new(ReqID) // 创建并返回 ReqID 的指针
 	return u, nil
 }
