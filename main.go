@@ -1,6 +1,7 @@
 package caddy_req_id
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -44,8 +45,10 @@ func (u UniqueID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyht
 
 	uniqueID := generateUniqueID(time.Now(), r.RemoteAddr, userID, r.Method, r.URL.String())
 	r.Header.Set("X-Unique-ID", uniqueID) // 设置请求头，传递到后端
-	// w.Header().Set("X-Unique-ID", uniqueID) // 设置响应头，返回给客户端
 
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, "X-Unique-ID", uniqueID)
+	r = r.WithContext(ctx)
 	return next.ServeHTTP(w, r)
 }
 
