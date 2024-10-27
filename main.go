@@ -10,6 +10,7 @@ import (
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	"go.uber.org/zap"
 )
 
 func init() {
@@ -19,6 +20,7 @@ func init() {
 
 type UniqueID struct {
 	UserIDHeader string `json:"user_id_header,omitempty"` // 用户ID从哪个HTTP头部字段读取
+	Logger       *zap.Logger
 }
 
 func (UniqueID) CaddyModule() caddy.ModuleInfo {
@@ -28,25 +30,37 @@ func (UniqueID) CaddyModule() caddy.ModuleInfo {
 	}
 }
 
+// Provision set up the module's configuration
+func (u *UniqueID) Provision(ctx caddy.Context) error {
+	u.Logger = ctx.Logger(u) // Get the logger from the context
+	return nil
+}
+
 func (u UniqueID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	userID := r.Header.Get(u.UserIDHeader)
 	if userID == "" {
 		userID = "anonymous"
 	}
 
-	// 生成唯一 ID
-	uniqueID := generateUniqueID(time.Now(), r.RemoteAddr, userID)
-	r.Header.Set("X-Unique-ID", uniqueID) // 将此 ID 加入请求头中，以便后续使用
+	uniqueID := generateUniqueID(time.Now(), r.RemoteAddr, userID, r.Method, r.URL.String())
+	r.Header.Set("X-Unique-ID", uniqueID)   // 设置请求头，传递到后端
+	w.Header().Set("X-Unique-ID", uniqueID) // 设置响应头，返回给客户端
 
-	// 可选：将此 ID 加入响应头或日志
-	w.Header().Set("X-Unique-ID", uniqueID)
+	u.Logger.Info("Request received",
+		zap.String("time", time.Now().Format(time.RFC3339Nano)),
+		zap.String("remote_addr", r.RemoteAddr),
+		zap.String("user_id", userID),
+		zap.String("method", r.Method),
+		zap.String("url", r.URL.String()),
+		zap.String("unique_id", uniqueID),
+	)
 
 	return next.ServeHTTP(w, r)
 }
 
 // generateUniqueID 根据时间、IP 和用户ID生成一个哈希值
-func generateUniqueID(t time.Time, ip, userID string) string {
-	data := fmt.Sprintf("%v-%v-%v", t.UnixNano(), ip, userID)
+func generateUniqueID(t time.Time, ip, userID, method, url string) string {
+	data := fmt.Sprintf("%v-%v-%v-%v-%v", t.UnixNano(), ip, userID, method, url)
 	hash := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(hash[:])
 }
@@ -55,7 +69,6 @@ var (
 	_ caddyhttp.MiddlewareHandler = (*UniqueID)(nil)
 )
 
-// parseCaddyfile 用于解析 Caddyfile 并配置 UniqueID 实例
 func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
 	var u UniqueID
 	if !h.Next() {
