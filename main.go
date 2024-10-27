@@ -1,7 +1,11 @@
-package caddy_extra
+package caddy_unique_id
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
@@ -9,42 +13,56 @@ import (
 )
 
 func init() {
-	caddy.RegisterModule(ExtraInfo{})
-	httpcaddyfile.RegisterHandlerDirective("extra_info", parseCaddyfile)
+	caddy.RegisterModule(UniqueID{})
+	httpcaddyfile.RegisterHandlerDirective("unique_id", parseCaddyfile)
 }
 
-// ExtraInfo 是一个简单的 HTTP 中间件，用于在响应中添加额外信息
-type ExtraInfo struct {
-	Message string `json:"message,omitempty"`
+type UniqueID struct {
+	UserIDHeader string `json:"user_id_header,omitempty"` // 用户ID从哪个HTTP头部字段读取
 }
 
-// CaddyModule 返回一个关于插件的信息
-func (ExtraInfo) CaddyModule() caddy.ModuleInfo {
+func (UniqueID) CaddyModule() caddy.ModuleInfo {
 	return caddy.ModuleInfo{
-		ID:  "http.handlers.extra_info",
-		New: func() caddy.Module { return new(ExtraInfo) },
+		ID:  "http.handlers.unique_id",
+		New: func() caddy.Module { return new(UniqueID) },
 	}
 }
 
-// ServeHTTP 实现 caddyhttp.MiddlewareHandler 接口
-func (e ExtraInfo) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-	// 在响应头中设置额外信息
-	w.Header().Add("X-Extra-Info", e.Message)
-	return next.ServeHTTP(w, r) // 继续执行下一个处理器
+func (u UniqueID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
+	userID := r.Header.Get(u.UserIDHeader)
+	if userID == "" {
+		userID = "anonymous"
+	}
+
+	// 生成唯一 ID
+	uniqueID := generateUniqueID(time.Now(), r.RemoteAddr, userID)
+	r.Header.Set("X-Unique-ID", uniqueID) // 将此 ID 加入请求头中，以便后续使用
+
+	// 可选：将此 ID 加入响应头或日志
+	w.Header().Set("X-Unique-ID", uniqueID)
+
+	return next.ServeHTTP(w, r)
+}
+
+// generateUniqueID 根据时间、IP 和用户ID生成一个哈希值
+func generateUniqueID(t time.Time, ip, userID string) string {
+	data := fmt.Sprintf("%v-%v-%v", t.UnixNano(), ip, userID)
+	hash := sha256.Sum256([]byte(data))
+	return hex.EncodeToString(hash[:])
 }
 
 var (
-	_ caddyhttp.MiddlewareHandler = (*ExtraInfo)(nil)
+	_ caddyhttp.MiddlewareHandler = (*UniqueID)(nil)
 )
 
-// parseCaddyfile 用于解析 Caddyfile 并配置 ExtraInfo 实例
+// parseCaddyfile 用于解析 Caddyfile 并配置 UniqueID 实例
 func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
-	var e ExtraInfo
+	var u UniqueID
 	if !h.Next() {
 		return nil, h.ArgErr()
 	}
-	if !h.AllArgs(&e.Message) {
+	if !h.AllArgs(&u.UserIDHeader) {
 		return nil, h.ArgErr()
 	}
-	return e, nil
+	return u, nil
 }
