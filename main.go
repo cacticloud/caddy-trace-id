@@ -11,52 +11,43 @@ import (
 )
 
 func init() {
-	caddy.RegisterModule(UniqueID{})
-	httpcaddyfile.RegisterHandlerDirective("unique_id", parseCaddyfile)
+	caddy.RegisterModule(ReqID{})
+	httpcaddyfile.RegisterHandlerDirective("req_id", parseCaddyfile)
 }
 
-type UniqueID struct {
-	UserIDHeader string `json:"user_id_header,omitempty"`
-	Logger       *zap.Logger
-	Prefix       string `json:"prefix,omitempty"`
+type ReqID struct {
+	Logger *zap.Logger
 }
 
-func (UniqueID) CaddyModule() caddy.ModuleInfo {
+func (ReqID) CaddyModule() caddy.ModuleInfo {
 	return caddy.ModuleInfo{
 		ID:  "http.handlers.unique_id",
-		New: func() caddy.Module { return new(UniqueID) },
+		New: func() caddy.Module { return new(ReqID) },
 	}
 }
 
-func (u *UniqueID) Provision(ctx caddy.Context) error {
+func (u *ReqID) Provision(ctx caddy.Context) error {
 	u.Logger = ctx.Logger(u)
-	if u.Prefix == "" {
-		u.Prefix = "req" // 设置默认前缀，如果未在配置中指定
-	}
 	return nil
 }
 
-func (u UniqueID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-	partUUID := uuid.New().String()[:8]
-	uniqueID := u.Prefix + "-" + partUUID
-	r.Header.Set("Req-ID", uniqueID)
+func (u ReqID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
+	ReqID := uuid.New().String()[:8]
+	r.Header.Set("Req-ID", ReqID)
 
-	u.Logger.Info("Generated unique ID", zap.String("Req-ID", uniqueID), zap.String("url", r.URL.String()))
+	u.Logger.Info("Generated unique ID", zap.String("Req-ID", ReqID), zap.String("url", r.URL.String()))
 
 	return next.ServeHTTP(w, r)
 }
 
 var (
-	_ caddyhttp.MiddlewareHandler = (*UniqueID)(nil)
+	_ caddyhttp.MiddlewareHandler = (*ReqID)(nil)
 )
 
 func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
-	var u UniqueID
+	var u ReqID
 	if !h.Next() {
 		return nil, h.ArgErr()
 	}
-	if h.Args(&u.UserIDHeader, &u.Prefix) {
-		return u, nil
-	}
-	return nil, h.ArgErr()
+	return u, nil
 }
