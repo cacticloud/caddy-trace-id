@@ -16,7 +16,7 @@ type Gizmo struct{}
 // CaddyModule 返回 Caddy 模块的信息，现在使用 http.handlers 命名空间
 func (Gizmo) CaddyModule() caddy.ModuleInfo {
 	return caddy.ModuleInfo{
-		ID:  "http.handlers.gizmo", // 修改这里以匹配 http.handlers
+		ID:  "http.handler.gizmo", // 修改这里以匹配 http.handlers
 		New: func() caddy.Module { return new(Gizmo) },
 	}
 }
