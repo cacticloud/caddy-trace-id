@@ -33,6 +33,7 @@ github.com/beorn7/perks/quantile
 github.com/caddyserver/caddy/v2
 github.com/caddyserver/caddy/v2/caddyconfig
 github.com/caddyserver/caddy/v2/caddyconfig/caddyfile
+github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile
 github.com/caddyserver/caddy/v2/cmd
 github.com/caddyserver/caddy/v2/internal
 github.com/caddyserver/caddy/v2/internal/filesystems
