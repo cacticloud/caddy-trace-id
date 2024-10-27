@@ -2,7 +2,6 @@ package caddy_req_id
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
@@ -17,8 +16,8 @@ func init() {
 }
 
 type ReqID struct {
-	Logger      *zap.Logger
-	LogRequests bool `json:"log_requests"` // 控制是否记录日志
+	Logger       *zap.Logger
+	CurrentReqID string // 存储为请求处理的一部分的当前 Req-ID
 }
 
 func (ReqID) CaddyModule() caddy.ModuleInfo {
@@ -33,13 +32,12 @@ func (u *ReqID) Provision(ctx caddy.Context) error {
 	return nil
 }
 
-func (u ReqID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-	reqID := uuid.New().String()[:8]
-	r.Header.Set("Req-ID", reqID)
+func (u *ReqID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
+	u.CurrentReqID = uuid.New().String()[:8] // 生成并存储 Req-ID
+	r.Header.Set("Req-ID", u.CurrentReqID)
 
-	if u.LogRequests {
-		u.Logger.Info("Generated unique ID", zap.String("Req-ID", reqID), zap.String("url", r.URL.String()))
-	}
+	// 日志中明确记录 Req-ID
+	u.Logger.Info("Generated unique ID", zap.String("Req-ID", u.CurrentReqID), zap.String("url", r.URL.String()))
 
 	return next.ServeHTTP(w, r)
 }
@@ -52,21 +50,6 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 	var u ReqID
 	if !h.Next() {
 		return nil, h.ArgErr()
-	}
-	for h.NextBlock(0) {
-		switch h.Val() {
-		case "log_requests":
-			if !h.NextArg() {
-				return nil, h.ArgErr()
-			}
-			logRequests, err := strconv.ParseBool(h.Val())
-			if err != nil {
-				return nil, err
-			}
-			u.LogRequests = logRequests
-		default:
-			return nil, h.ArgErr()
-		}
 	}
 	return u, nil
 }
