@@ -1,15 +1,12 @@
-package caddy_unique_id
+package caddy_req_id
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -19,8 +16,9 @@ func init() {
 }
 
 type UniqueID struct {
-	UserIDHeader string `json:"user_id_header,omitempty"` // 用户ID从哪个HTTP头部字段读取
+	UserIDHeader string `json:"user_id_header,omitempty"`
 	Logger       *zap.Logger
+	Prefix       string `json:"prefix,omitempty"`
 }
 
 func (UniqueID) CaddyModule() caddy.ModuleInfo {
@@ -30,39 +28,22 @@ func (UniqueID) CaddyModule() caddy.ModuleInfo {
 	}
 }
 
-// Provision set up the module's configuration
 func (u *UniqueID) Provision(ctx caddy.Context) error {
-	u.Logger = ctx.Logger(u) // Get the logger from the context
+	u.Logger = ctx.Logger(u)
+	if u.Prefix == "" {
+		u.Prefix = "req" // 设置默认前缀，如果未在配置中指定
+	}
 	return nil
 }
 
 func (u UniqueID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-	userID := r.Header.Get(u.UserIDHeader)
-	if userID == "" {
-		userID = "anonymous"
-	}
+	partUUID := uuid.New().String()[:8]
+	uniqueID := u.Prefix + "-" + partUUID
+	r.Header.Set("Req-ID", uniqueID)
 
-	uniqueID := generateUniqueID(time.Now(), r.RemoteAddr, userID, r.Method, r.URL.String())
-	r.Header.Set("X-Unique-ID", uniqueID)   // 设置请求头，传递到后端
-	w.Header().Set("X-Unique-ID", uniqueID) // 设置响应头，返回给客户端
-
-	u.Logger.Info("Request received",
-		zap.String("time", time.Now().Format(time.RFC3339Nano)),
-		zap.String("remote_addr", r.RemoteAddr),
-		zap.String("user_id", userID),
-		zap.String("method", r.Method),
-		zap.String("url", r.URL.String()),
-		zap.String("unique_id", uniqueID),
-	)
+	u.Logger.Info("Generated unique ID", zap.String("Req-ID", uniqueID), zap.String("url", r.URL.String()))
 
 	return next.ServeHTTP(w, r)
-}
-
-// generateUniqueID 根据时间、IP 和用户ID生成一个哈希值
-func generateUniqueID(t time.Time, ip, userID, method, url string) string {
-	data := fmt.Sprintf("%v-%v-%v-%v-%v", t.UnixNano(), ip, userID, method, url)
-	hash := sha256.Sum256([]byte(data))
-	return hex.EncodeToString(hash[:])
 }
 
 var (
@@ -74,8 +55,8 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 	if !h.Next() {
 		return nil, h.ArgErr()
 	}
-	if !h.AllArgs(&u.UserIDHeader) {
-		return nil, h.ArgErr()
+	if h.Args(&u.UserIDHeader, &u.Prefix) {
+		return u, nil
 	}
-	return u, nil
+	return nil, h.ArgErr()
 }
