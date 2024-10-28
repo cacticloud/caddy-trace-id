@@ -17,7 +17,8 @@ func init() {
 }
 
 type ReqID struct {
-	Logger       *zap.Logger
+	Enabled bool `json:"enabled,omitempty"`
+	Logger  *zap.Logger
 }
 
 func (ReqID) CaddyModule() caddy.ModuleInfo {
@@ -33,6 +34,10 @@ func (u *ReqID) Provision(ctx caddy.Context) error {
 }
 
 func (u ReqID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
+	if !u.Enabled {
+		return next.ServeHTTP(w, r)
+	}
+
 	reqID := uuid.New().String()[:32]
 	r.Header.Set("Req-ID", reqID)
 	w.Header().Set("Req-ID", reqID)
@@ -52,5 +57,9 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 	if !h.Next() {
 		return nil, h.ArgErr()
 	}
+	if h.Args(&u.Enabled) {
+		return u, nil
+	}
+	u.Enabled = true
 	return u, nil
 }
