@@ -17,7 +17,6 @@ func init() {
 }
 
 type ReqID struct {
-	UserIDHeader string `json:"user_id_header,omitempty"`
 	Logger       *zap.Logger
 }
 
@@ -34,10 +33,6 @@ func (u *ReqID) Provision(ctx caddy.Context) error {
 }
 
 func (u ReqID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-	userID := r.Header.Get(u.UserIDHeader)
-	if userID == "" {
-		userID = "anonymous"
-	}
 	reqID := uuid.New().String()[:32]
 	r.Header.Set("Req-ID", reqID)
 	w.Header().Set("Req-ID", reqID)
@@ -55,9 +50,6 @@ var (
 func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
 	var u ReqID
 	if !h.Next() {
-		return nil, h.ArgErr()
-	}
-	if !h.AllArgs(&u.UserIDHeader) {
 		return nil, h.ArgErr()
 	}
 	return u, nil
