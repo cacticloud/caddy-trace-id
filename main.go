@@ -38,7 +38,7 @@ func (u ReqID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.
 	if userID == "" {
 		userID = "anonymous"
 	}
-	reqID := uuid.New().String()[:24]
+	reqID := uuid.New().String()[:32]
 	r.Header.Set("Req-ID", reqID)
 	w.Header().Set("Req-ID", reqID)
 
