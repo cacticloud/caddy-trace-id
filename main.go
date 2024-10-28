@@ -46,12 +46,11 @@ func (u UniqueID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyht
 	uniqueID := generateUniqueID(time.Now(), r.RemoteAddr, userID, r.Method, r.URL.String())
 	r.Header.Set("X-Unique-ID", uniqueID) // 设置请求头，传递到后端
 
-	ctx := r.Context()
-	ctx = context.WithValue(ctx, "X-Unique-ID", uniqueID)
-	r = r.WithContext(ctx)
-	return next.ServeHTTP(w, r)
-}
+	newContext := context.WithValue(r.Context(), "X-Unique-ID", uniqueID)
+	newRequest := r.WithContext(newContext)
 
+	return next.ServeHTTP(w, newRequest)
+}
 
 func generateUniqueID(t time.Time, ip, userID, method, url string) string {
 	data := fmt.Sprintf("%v-%v-%v-%v-%v", t.UnixNano(), ip, userID, method, url)
