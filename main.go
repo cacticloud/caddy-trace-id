@@ -21,6 +21,7 @@ type ReqID struct {
 	Logger       *zap.Logger
 }
 
+
 func (ReqID) CaddyModule() caddy.ModuleInfo {
 	return caddy.ModuleInfo{
 		ID:  "http.handlers.req_id",
