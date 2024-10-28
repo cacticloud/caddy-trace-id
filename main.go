@@ -17,7 +17,7 @@ func init() {
 }
 
 type ReqID struct {
-	UserIDHeader string json:"user_id_header,omitempty" 
+	UserIDHeader string `json:"user_id_header,omitempty"`
 	Logger       *zap.Logger
 }
 
@@ -38,7 +38,7 @@ func (u ReqID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.
 	if userID == "" {
 		userID = "anonymous"
 	}
-	reqID := uuid.New().String()[:16] 
+	reqID := uuid.New().String()[:16]
 	r.Header.Set("Req-ID", reqID)
 	w.Header().Set("Req-ID", reqID)
 
