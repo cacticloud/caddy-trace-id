@@ -52,7 +52,7 @@ func (u UniqueID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyht
 	return next.ServeHTTP(w, r)
 }
 
-// generateUniqueID 根据时间、IP 和用户ID生成一个哈希值
+
 func generateUniqueID(t time.Time, ip, userID, method, url string) string {
 	data := fmt.Sprintf("%v-%v-%v-%v-%v", t.UnixNano(), ip, userID, method, url)
 	hash := sha256.Sum256([]byte(data))
