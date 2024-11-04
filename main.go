@@ -3,10 +3,8 @@ package caddy_req_id
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	"github.com/caddyserver/caddy/v2"
-	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/google/uuid"
@@ -18,8 +16,7 @@ func init() {
 }
 
 type ReqID struct {
-	Length     int            `json:"length"`
-	Additional map[string]int `json:"additional,omitempty"`
+	Enabled bool `json:"enabled,omitempty"`
 }
 
 func (ReqID) CaddyModule() caddy.ModuleInfo {
@@ -30,14 +27,6 @@ func (ReqID) CaddyModule() caddy.ModuleInfo {
 }
 
 func (m *ReqID) Provision(ctx caddy.Context) error {
-	if m.Length < 1 {
-		m.Length = 21
-	}
-
-	if m.Additional == nil {
-		m.Additional = make(map[string]int)
-	}
-
 	return nil
 }
 
@@ -52,71 +41,19 @@ func (m ReqID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.
 	return next.ServeHTTP(w, newRequest)
 }
 
-func (m *ReqID) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
-	arg1 := d.NextArg()
-	arg2 := d.NextArg()
-
-	// Parse standalone length
-	if arg1 && arg2 {
-		val := d.Val()
-		len, err := strconv.Atoi(val)
-
-		if err != nil {
-			return d.Err("failed to convert length to int")
-		}
-
-		if len < 1 {
-			return d.Err("length cannot be less than 1")
-		}
-
-		m.Length = len
-	}
-
-	if m.Additional == nil {
-		m.Additional = make(map[string]int)
-	}
-
-	// Parse additional IDs
-	for d.NextBlock(0) {
-		key := d.Val()
-		if !d.NextArg() {
-			return d.ArgErr()
-		}
-
-		val := d.Val()
-		len, err := strconv.Atoi(val)
-
-		if err != nil {
-			return d.Err("failed to convert length to int")
-		}
-
-		if len < 1 {
-			return d.Err("length cannot be less than 1")
-		}
-
-		if _, ok := m.Additional[key]; ok {
-			return d.Errf("duplicate key: %v\n", key)
-		}
-
-		m.Additional[key] = len
-	}
-
-	return nil
-}
-
 func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
-	m := new(ReqID)
-	err := m.UnmarshalCaddyfile(h.Dispenser)
-	if err != nil {
-		return nil, err
+	var u ReqID
+	if !h.Next() {
+		return nil, h.ArgErr()
 	}
-
-	return m, nil
+	remainingArgs := h.RemainingArgs()
+	if len(remainingArgs) > 0 {
+		u.Enabled = (remainingArgs[0] == "true")
+	}
+	return u, nil
 }
 
-// Interface guards
 var (
 	_ caddy.Provisioner           = (*ReqID)(nil)
 	_ caddyhttp.MiddlewareHandler = (*ReqID)(nil)
-	_ caddyfile.Unmarshaler       = (*ReqID)(nil)
 )
