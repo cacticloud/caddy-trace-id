@@ -1,6 +1,7 @@
 package caddy_req_id
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
@@ -43,21 +44,14 @@ func (m *ReqID) Provision(ctx caddy.Context) error {
 func (m ReqID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	repl := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
 	id := nanoid.Must(m.Length)
-	repl.Set("http.request_id", id)
+	repl.Set("http.request_id", id) // 设置到替换器中，以便在其他地方使用
+	r.Header.Set("Req-ID", id)      // 设置到请求头，供下游处理使用
+	w.Header().Set("Req-ID", id)    // 设置到响应头，客户端可以见到
 
-	for key, value := range m.Additional {
-		id := nanoid.Must(value)
-		repl.Set("http.request_id."+key, id)
-	}
+	newContext := context.WithValue(r.Context(), "Req-ID", id)
+	newRequest := r.WithContext(newContext)
 
-	// reqID := uuid.New().String()[:32]
-	// r.Header.Set("Req-ID", reqID)
-	// w.Header().Set("Req-ID", reqID)
-
-	// newContext := context.WithValue(r.Context(), "Req-ID", reqID)
-	// newRequest := r.WithContext(newContext)
-
-	return next.ServeHTTP(w, r)
+	return next.ServeHTTP(w, newRequest)
 }
 
 func (m *ReqID) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
