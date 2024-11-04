@@ -9,7 +9,7 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	nanoid "github.com/matoous/go-nanoid/v2"
+	"github.com/google/uuid"
 )
 
 func init() {
@@ -42,13 +42,11 @@ func (m *ReqID) Provision(ctx caddy.Context) error {
 }
 
 func (m ReqID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-	// repl := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
-	id := nanoid.Must(18)
-	// repl.Set("http.request_id", id) // 设置到替换器中，以便在其他地方使用
-	r.Header.Set("Req-ID", id)      // 设置到请求头，供下游处理使用
-	w.Header().Set("Req-ID", id)    // 设置到响应头，客户端可以见到
+	reqID := uuid.New().String()[:32]
+	r.Header.Set("Req-ID", reqID)
+	w.Header().Set("Req-ID", reqID)
 
-	newContext := context.WithValue(r.Context(), "Req-ID", id)
+	newContext := context.WithValue(r.Context(), "Req-ID", reqID)
 	newRequest := r.WithContext(newContext)
 
 	return next.ServeHTTP(w, newRequest)
@@ -115,7 +113,6 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 
 	return m, nil
 }
-
 
 // Interface guards
 var (
