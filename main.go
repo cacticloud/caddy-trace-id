@@ -42,9 +42,9 @@ func (m *ReqID) Provision(ctx caddy.Context) error {
 }
 
 func (m ReqID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-	repl := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
+	// repl := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
 	id := nanoid.Must(m.Length)
-	repl.Set("http.request_id", id) // 设置到替换器中，以便在其他地方使用
+	// repl.Set("http.request_id", id) // 设置到替换器中，以便在其他地方使用
 	r.Header.Set("Req-ID", id)      // 设置到请求头，供下游处理使用
 	w.Header().Set("Req-ID", id)    // 设置到响应头，客户端可以见到
 
