@@ -211,6 +211,9 @@ github.com/libdns/libdns
 github.com/manifoldco/promptui
 github.com/manifoldco/promptui/list
 github.com/manifoldco/promptui/screenbuf
+# github.com/matoous/go-nanoid/v2 v2.1.0
+## explicit; go 1.20
+github.com/matoous/go-nanoid/v2
 # github.com/mattn/go-colorable v0.1.13
 ## explicit; go 1.15
 github.com/mattn/go-colorable

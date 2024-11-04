@@ -1,14 +1,14 @@
 package caddy_req_id
 
 import (
-	"context"
 	"net/http"
+	"strconv"
 
 	"github.com/caddyserver/caddy/v2"
+	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	"github.com/google/uuid"
-	"go.uber.org/zap"
+	nanoid "github.com/matoous/go-nanoid/v2"
 )
 
 func init() {
@@ -17,8 +17,8 @@ func init() {
 }
 
 type ReqID struct {
-	Enabled bool `json:"enabled,omitempty"`
-	Logger  *zap.Logger
+	Length     int            `json:"length"`
+	Additional map[string]int `json:"additional,omitempty"`
 }
 
 func (ReqID) CaddyModule() caddy.ModuleInfo {
@@ -28,41 +28,103 @@ func (ReqID) CaddyModule() caddy.ModuleInfo {
 	}
 }
 
-func (u *ReqID) Provision(ctx caddy.Context) error {
-	u.Logger = ctx.Logger(u)
+func (m *ReqID) Provision(ctx caddy.Context) error {
+	if m.Length < 1 {
+		m.Length = 21
+	}
+
+	if m.Additional == nil {
+		m.Additional = make(map[string]int)
+	}
+
 	return nil
 }
 
-func (u ReqID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-	if !u.Enabled {
-		return next.ServeHTTP(w, r)
+func (m ReqID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
+	repl := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
+	id := nanoid.Must(m.Length)
+	repl.Set("http.request_id", id)
+
+	for key, value := range m.Additional {
+		id := nanoid.Must(value)
+		repl.Set("http.request_id."+key, id)
 	}
 
-	reqID := uuid.New().String()[:32]
-	r.Header.Set("Req-ID", reqID)
-	w.Header().Set("Req-ID", reqID)
+	// reqID := uuid.New().String()[:32]
+	// r.Header.Set("Req-ID", reqID)
+	// w.Header().Set("Req-ID", reqID)
 
-	newContext := context.WithValue(r.Context(), "Req-ID", reqID)
-	newRequest := r.WithContext(newContext)
+	// newContext := context.WithValue(r.Context(), "Req-ID", reqID)
+	// newRequest := r.WithContext(newContext)
 
-	return next.ServeHTTP(w, newRequest)
+	return next.ServeHTTP(w, r)
 }
 
-var (
-	_ caddyhttp.MiddlewareHandler = (*ReqID)(nil)
-)
+func (m *ReqID) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
+	arg1 := d.NextArg()
+	arg2 := d.NextArg()
+
+	// Parse standalone length
+	if arg1 && arg2 {
+		val := d.Val()
+		len, err := strconv.Atoi(val)
+
+		if err != nil {
+			return d.Err("failed to convert length to int")
+		}
+
+		if len < 1 {
+			return d.Err("length cannot be less than 1")
+		}
+
+		m.Length = len
+	}
+
+	if m.Additional == nil {
+		m.Additional = make(map[string]int)
+	}
+
+	// Parse additional IDs
+	for d.NextBlock(0) {
+		key := d.Val()
+		if !d.NextArg() {
+			return d.ArgErr()
+		}
+
+		val := d.Val()
+		len, err := strconv.Atoi(val)
+
+		if err != nil {
+			return d.Err("failed to convert length to int")
+		}
+
+		if len < 1 {
+			return d.Err("length cannot be less than 1")
+		}
+
+		if _, ok := m.Additional[key]; ok {
+			return d.Errf("duplicate key: %v\n", key)
+		}
+
+		m.Additional[key] = len
+	}
+
+	return nil
+}
 
 func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
-	var u ReqID
-	if !h.Next() {
-		return nil, h.ArgErr()
-	}
-	remainingArgs := h.RemainingArgs()
-	if len(remainingArgs) > 0 {
-		u.Enabled = (remainingArgs[0] == "true") // 解析为布尔值
-	} else {
-		u.Enabled = true // 默认值
+	m := new(ReqID)
+	err := m.UnmarshalCaddyfile(h.Dispenser)
+	if err != nil {
+		return nil, err
 	}
 
-	return u, nil
+	return m, nil
 }
+
+// Interface guards
+var (
+	_ caddy.Provisioner           = (*ReqID)(nil)
+	_ caddyhttp.MiddlewareHandler = (*ReqID)(nil)
+	_ caddyfile.Unmarshaler       = (*ReqID)(nil)
+)
