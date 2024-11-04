@@ -1,7 +1,6 @@
 package caddy_req_id
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/caddyserver/caddy/v2"
@@ -31,14 +30,15 @@ func (m *ReqID) Provision(ctx caddy.Context) error {
 }
 
 func (m ReqID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-	reqID := uuid.New().String()[:32]
-	r.Header.Set("Req-ID", reqID)
-	w.Header().Set("Req-ID", reqID)
+	if m.Enabled {
+		reqID := uuid.New().String()
+		r.Header.Set("Req-ID", reqID)
+		w.Header().Set("Req-ID", reqID)
+		// newContext := context.WithValue(r.Context(), "Req-ID", reqID)
+		// newRequest := r.WithContext(newContext)
+	}
 
-	newContext := context.WithValue(r.Context(), "Req-ID", reqID)
-	newRequest := r.WithContext(newContext)
-
-	return next.ServeHTTP(w, newRequest)
+	return next.ServeHTTP(w, r)
 }
 
 func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
