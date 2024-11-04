@@ -25,19 +25,12 @@ func (ReqID) CaddyModule() caddy.ModuleInfo {
 	}
 }
 
-func (m *ReqID) Provision(ctx caddy.Context) error {
-	return nil
-}
-
 func (m ReqID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	if m.Enabled {
 		reqID := uuid.New().String()
 		r.Header.Set("Req-ID", reqID)
 		w.Header().Set("Req-ID", reqID)
-		// newContext := context.WithValue(r.Context(), "Req-ID", reqID)
-		// newRequest := r.WithContext(newContext)
 	}
-
 	return next.ServeHTTP(w, r)
 }
 
@@ -54,6 +47,5 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 }
 
 var (
-	_ caddy.Provisioner           = (*ReqID)(nil)
 	_ caddyhttp.MiddlewareHandler = (*ReqID)(nil)
 )
