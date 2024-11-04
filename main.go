@@ -57,9 +57,12 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 	if !h.Next() {
 		return nil, h.ArgErr()
 	}
-	// if h.Args(&u.Enabled) {
-	// 	return u, nil
-	// }
-	u.Enabled = true
+	remainingArgs := h.RemainingArgs()
+	if len(remainingArgs) > 0 {
+		u.Enabled = (remainingArgs[0] == "true") // 解析为布尔值
+	} else {
+		u.Enabled = true // 默认值
+	}
+
 	return u, nil
 }
