@@ -1,6 +1,9 @@
 package caddy_req_id
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 
 	"github.com/caddyserver/caddy/v2"
@@ -25,9 +28,20 @@ func (ReqID) CaddyModule() caddy.ModuleInfo {
 	}
 }
 
+func enhancedUUID() string {
+	uuid := uuid.New().String()
+	randomBytes := make([]byte, 16)
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		panic(err)
+	}
+	hash := sha256.Sum256(append([]byte(uuid), randomBytes...))
+	return hex.EncodeToString(hash[:])
+}
+
 func (m ReqID) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	if m.Enabled {
-		reqID := uuid.New().String()
+		reqID := enhancedUUID()
 		r.Header.Set("Req-ID", reqID)
 		w.Header().Set("Req-ID", reqID)
 	}
